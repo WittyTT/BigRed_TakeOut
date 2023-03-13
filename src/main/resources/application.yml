@@ -8,3 +8,14 @@ spring:
       password: password
 BigRed:
   path: /Users/yutaojing/Desktop/code/BigRed_TakeOut_Media/img/
+
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    jedis:
+      pool:
+        max-active: 8
+        max-wait: 1ms
+        max-idle: 4
+        min-idle: 0
