@@ -15,11 +15,14 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @Slf4j
@@ -31,6 +34,8 @@ public class DishController {
 private DishService dishService;
     @Autowired
     private DishFlavorService dishFlavorService;
+    @Autowired
+    private RedisTemplate redisTemplate;
     @GetMapping("/page")
     public R Page(int page, int pageSize, String name){
         log.info("page={},pagesize={},name={}",page,pageSize,name);
@@ -64,6 +69,8 @@ private DishService dishService;
     //新增菜品
     @PostMapping
     public R<String> save(@RequestBody DishDto dishDto){
+        String key = "dish_"+dishDto.getCategoryId()+"_1";
+        redisTemplate.delete(key);
        log.info("数据为：{}",dishDto);
        dishService.saveWithFlavor(dishDto);
 
@@ -78,6 +85,8 @@ private DishService dishService;
 
     @PutMapping
     public R<String> update(@RequestBody DishDto dishDto){
+        String key = "dish_"+dishDto.getCategoryId()+"_1";
+        redisTemplate.delete(key);
         log.info("数据为：{}",dishDto);
         dishService.updateWithFlavor(dishDto);
         return R.success("菜品更新成功！");
@@ -111,12 +120,19 @@ private DishService dishService;
 //    }
     @GetMapping("/list")
     public R<List<DishDto>> UpdateInSetMeal(Dish dish){
+        List<DishDto>listDto=null;
+        String key="dish_"+dish.getCategoryId()+"_"+dish.getStatus();
+        listDto = (List<DishDto>)redisTemplate.opsForValue().get(key);
+        if(listDto!=null)
+            return R.success(listDto);
+
+
         LambdaQueryWrapper<Dish>queryWrapper=new LambdaQueryWrapper<>();
         queryWrapper.eq(dish.getCategoryId()!=null,Dish::getCategoryId,dish.getCategoryId());
         queryWrapper.eq(Dish::getStatus,1);
         queryWrapper.orderByAsc(Dish::getSort).orderByDesc(Dish::getUpdateTime);
         List<Dish>list=dishService.list(queryWrapper);
-        List<DishDto>listDto=new ArrayList<>();
+        listDto=new ArrayList<>();
         for (Dish record : list) {
             DishDto dishDto=new DishDto();
             Long categoryId = record.getCategoryId();
@@ -132,6 +148,7 @@ private DishService dishService;
             dishDto.setFlavors(dishFlavors);
             BeanUtils.copyProperties(record, dishDto);
             listDto.add(dishDto);
+            redisTemplate.opsForValue().set(key,listDto,60,TimeUnit.MINUTES);
         }
 
 

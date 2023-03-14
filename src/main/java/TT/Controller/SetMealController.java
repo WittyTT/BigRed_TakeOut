@@ -15,10 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 @RestController
 @Slf4j
 @RequestMapping("/setmeal")
@@ -27,6 +30,8 @@ public class SetMealController {
     private SetMealService setMealService;
     @Autowired
     private CategoryService categoryService;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
 
 
@@ -84,9 +89,15 @@ public class SetMealController {
     }
     @GetMapping("/list")
     public R<List<Setmeal>> GetSetMealList(Setmeal setmeal){
+        List<Setmeal>list=null;
+        String key="categoryID_"+setmeal.getCategoryId()+"_"+setmeal.getStatus();
+        redisTemplate.opsForValue().get(key);
+        if(list!=null)
+            return R.success(list);
         LambdaQueryWrapper<Setmeal>queryWrapper=new LambdaQueryWrapper<>();
         queryWrapper.eq(setmeal.getCategoryId()!=null,Setmeal::getCategoryId,setmeal.getCategoryId());
-        List<Setmeal>list=setMealService.list(queryWrapper);
+        list=setMealService.list(queryWrapper);
+        redisTemplate.opsForValue().set(key,list,60, TimeUnit.MINUTES);
         return R.success(list);
     }
 }
